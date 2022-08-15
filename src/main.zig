@@ -41,7 +41,7 @@ pub fn main() anyerror!void {
 
     //
 
-    var stmt = try db.prepareWithDiags("SELECT commune FROM mytable WHERE departement_code = ?{usize}", .{ .diags = &diags });
+    var stmt = try db.prepareWithDiags("SELECT town FROM mytable WHERE departement_code = ?{usize}", .{ .diags = &diags });
     defer stmt.deinit();
 
     var iter = try stmt.iterator([]const u8, .{@as(usize, 67)});
