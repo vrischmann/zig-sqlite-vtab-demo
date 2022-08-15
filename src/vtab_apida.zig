@@ -13,12 +13,12 @@ const c = sqlite.c;
 const GeoDataEntry = struct {
     town: []const u8,
     postal_code: isize,
-    departement_code: isize,
-    region_code: isize,
+    departement_code: []const u8,
+    region_code: []const u8,
 };
 
-const communes_endpoint = "https://geo.api.gouv.fr/communes";
-const communes_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{d}/communes";
+const towns_endpoint = "https://geo.api.gouv.fr/communes";
+const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{d}/communes";
 
 /// Direct mapping to the JSON returned by the API
 const GeoDataJSONEntry = struct {
@@ -33,11 +33,18 @@ const FetchAllGeoDataError = error{
     HTTPRequestError,
 } || mem.Allocator.Error || fmt.ParseIntError || json.ParseError([]GeoDataJSONEntry) || curl.Error;
 
+/// Fetch the Geo data. The endpoint must be either:
+/// * the general `towns_endpoint` which will return _all_ towns in France
+/// * a endpoint built using `towns_for_departement_endpoint` which will return all towns for a specific departement.
 fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeoDataError![]GeoDataEntry {
-    // NOTE(vicnent): don't release Zig-allocated resources here, we always pass an arena as allocator and handle errors in the calling function
+    // NOTE(vincent): don't release Zig-allocated resources here, we always pass an arena as allocator and handle errors in the calling function
+
+    // Perform the HTTP request using curl
 
     const Fifo = std.fifo.LinearFifo(u8, .{ .Dynamic = {} });
+
     var fifo = Fifo.init(allocator);
+    try fifo.ensureTotalCapacity(40000);
 
     var easy = try curl.Easy.init();
     defer easy.cleanup();
@@ -52,18 +59,26 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     const code = try easy.getResponseCode();
     if (code != 200) return error.HTTPRequestError;
 
+    //
+
     var token_stream = json.TokenStream.init(fifo.readableSlice(0));
-    const data = try json.parse([]GeoDataJSONEntry, &token_stream, .{ .allocator = allocator });
+    const data = try json.parse([]GeoDataJSONEntry, &token_stream, .{
+        .allocator = allocator,
+        .ignore_unknown_fields = true,
+    });
 
     var result = try allocator.alloc(GeoDataEntry, data.len);
     for (result) |*entry, i| {
         const raw_data = data[i];
 
         entry.* = .{
-            .town = try allocator.dupe(u8, raw_data.nom),
-            .postal_code = try fmt.parseInt(isize, raw_data.codesPostaux[0], 10),
-            .departement_code = try fmt.parseInt(isize, raw_data.codeDepartement, 10),
-            .region_code = try fmt.parseInt(isize, raw_data.codeRegion, 10),
+            .town = raw_data.nom,
+            .postal_code = if (raw_data.codesPostaux.len > 0)
+                try fmt.parseInt(isize, raw_data.codesPostaux[0], 10)
+            else
+                0,
+            .departement_code = raw_data.codeDepartement,
+            .region_code = raw_data.codeRegion,
         };
     }
 
@@ -127,21 +142,25 @@ pub const TableCursor = struct {
 
     data_arena: std.heap.ArenaAllocator,
     data: []GeoDataEntry,
-
     pos: usize,
 
     pub const InitError = error{} || mem.Allocator.Error;
 
-    pub fn init(allocator: mem.Allocator, parent: *Table) InitError!*TableCursor {
-        var res = try allocator.create(TableCursor);
+    pub fn init(gpa: mem.Allocator, parent: *Table) InitError!*TableCursor {
+        var res = try gpa.create(TableCursor);
         res.* = .{
-            .allocator = allocator,
+            .allocator = gpa,
             .parent = parent,
-            .data_arena = std.heap.ArenaAllocator.init(allocator),
+            .data_arena = std.heap.ArenaAllocator.init(gpa),
             .data = &[_]GeoDataEntry{},
-            .pos = 0,
+            .pos = 204,
         };
         return res;
+    }
+
+    pub fn deinit(cursor: *TableCursor) void {
+        cursor.data_arena.deinit();
+        cursor.allocator.destroy(cursor);
     }
 
     const FilterError = error{} || FetchAllGeoDataError;
@@ -151,9 +170,14 @@ pub const TableCursor = struct {
         _ = diags;
         _ = index;
 
+        // TODO(vincent): use the index data
+
         if (cursor.data.len <= 0) {
             cursor.data_arena.deinit();
-            cursor.data = try fetchAllGeoData(cursor.data_arena.allocator(), communes_endpoint);
+            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), towns_endpoint) catch |err| {
+                debug.print("fetchAllGeoData failed, err: {}\n", .{err});
+                return err;
+            };
             errdefer cursor.data_arena.deinit();
         }
     }
@@ -179,8 +203,8 @@ pub const TableCursor = struct {
     pub const Column = union(enum) {
         town: []const u8,
         postal_code: isize,
-        departement_code: isize,
-        region_code: isize,
+        departement_code: []const u8,
+        region_code: []const u8,
     };
 
     pub fn column(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, column_number: i32) ColumnError!Column {
