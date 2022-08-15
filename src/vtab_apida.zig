@@ -164,20 +164,24 @@ pub const TableCursor = struct {
 
     pub const FilterError = error{} || FetchAllGeoDataError;
 
-    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier) FilterError!void {
+    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, arg: []const u8) FilterError!void {
         _ = cursor;
         _ = diags;
         _ = index;
 
-        // TODO(vincent): use the index data
-
         if (cursor.data.len <= 0) {
             cursor.data_arena.deinit();
-            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), towns_endpoint) catch |err| {
+            errdefer cursor.data_arena.deinit();
+
+            const endpoint = if (index.num == 100)
+                try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{arg})
+            else
+                towns_endpoint;
+
+            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), endpoint) catch |err| {
                 debug.print("fetchAllGeoData failed, err: {}\n", .{err});
                 return err;
             };
-            errdefer cursor.data_arena.deinit();
         }
     }
 
@@ -207,8 +211,6 @@ pub const TableCursor = struct {
     };
 
     pub fn column(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, column_number: i32) ColumnError!Column {
-        _ = diags;
-
         const entry = cursor.data[cursor.pos];
 
         switch (column_number) {
