@@ -54,7 +54,6 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     try easy.setAcceptEncodingGzip();
     try easy.setWriteFn(curl.writeToFifo(Fifo));
     try easy.setWriteData(&fifo);
-    try easy.setVerbose(true);
     try easy.perform();
     const code = try easy.getResponseCode();
     if (code != 200) return error.HTTPRequestError;
