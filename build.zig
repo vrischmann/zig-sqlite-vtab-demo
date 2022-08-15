@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const libcurl = @import("third_party/zig-libcurl/libcurl.zig");
+
 pub fn build(b: *std.build.Builder) !void {
     var target = b.standardTargetOptions(.{});
     const target_info = try std.zig.system.NativeTargetInfo.detect(b.allocator, target);
@@ -17,6 +19,8 @@ pub fn build(b: *std.build.Builder) !void {
     sqlite.setBuildMode(mode);
     sqlite.addIncludeDir("third_party/zig-sqlite/c");
     sqlite.linkLibC();
+
+    const curl = try libcurl.create(b, target, mode);
 
     //
 
@@ -44,6 +48,7 @@ pub fn build(b: *std.build.Builder) !void {
     exe.linkLibrary(sqlite);
     exe.addIncludeDir("third_party/zig-sqlite/c");
     exe.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+    curl.link(exe, .{ .import_name = "curl" });
     exe.install();
 
     const run_cmd = exe.run();
