@@ -1,3 +1,6 @@
 [submodule "third_party/zig-sqlite"]
 	path = third_party/zig-sqlite
 	url = https://github.com/vrischmann/zig-sqlite
+[submodule "third_party/zig-libcurl"]
+	path = third_party/zig-libcurl
+	url = https://github.com/mattnite/zig-libcurl.git
