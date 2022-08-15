@@ -162,7 +162,7 @@ pub const TableCursor = struct {
         cursor.allocator.destroy(cursor);
     }
 
-    const FilterError = error{} || FetchAllGeoDataError;
+    pub const FilterError = error{} || FetchAllGeoDataError;
 
     pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier) FilterError!void {
         _ = cursor;
