@@ -7,6 +7,12 @@ const apida = @import("vtab_apida.zig");
 
 const name = "apida";
 
+// TODO(vincent): this was an attempt at building a virtual table as a loadable extension but it doesn't work.
+// sqlite does some trickery with the C macros SQLITE_EXTENSION_INIT1/SQLITE_EXTENSION_INIT2 which basically
+// redefine the exported C API to reference functions on a global variable `sqlite3_api`.
+//
+// That doesn't work Zig as is, I think we will have to do something equivalent in zig-sqlite's c.zig file.
+
 pub var sqlite3_api: *c.sqlite3_api_routines = undefined;
 
 var module_allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
