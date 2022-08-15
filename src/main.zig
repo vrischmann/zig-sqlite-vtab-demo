@@ -2,6 +2,7 @@ const std = @import("std");
 const debug = std.debug;
 
 const sqlite = @import("sqlite");
+const curl = @import("curl");
 
 const apida = @import("vtab_apida.zig");
 
@@ -10,6 +11,12 @@ pub fn main() anyerror!void {
     defer if (gpa.deinit()) {
         std.debug.panic("leaks detected", .{});
     };
+
+    // Initiailze curl
+    try curl.globalInit();
+    defer curl.globalCleanup();
+
+    //
 
     var allocator = gpa.allocator();
 
@@ -30,11 +37,11 @@ pub fn main() anyerror!void {
         debug.print("diags: {s}\n", .{diags});
     }
 
-    try db.exec("CREATE VIRTUAL TABLE découpage_administratif USING apida", .{ .diags = &diags }, .{});
+    try db.exec("CREATE VIRTUAL TABLE mytable USING apida", .{ .diags = &diags }, .{});
 
     //
 
-    var stmt = try db.prepareWithDiags("SELECT commune FROM découpage_administratif WHERE code_département = ?{usize}", .{ .diags = &diags });
+    var stmt = try db.prepareWithDiags("SELECT commune FROM mytable WHERE departement_code = ?{usize}", .{ .diags = &diags });
     defer stmt.deinit();
 
     var iter = try stmt.iterator([]const u8, .{@as(usize, 67)});

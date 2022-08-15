@@ -1,6 +1,9 @@
 const std = @import("std");
 
 const libcurl = @import("third_party/zig-libcurl/libcurl.zig");
+const libzlib = @import("third_party/zig-zlib/zlib.zig");
+const libmbedtls = @import("third_party/zig-mbedtls/mbedtls.zig");
+const libssh2 = @import("third_party/zig-libssh2/libssh2.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     var target = b.standardTargetOptions(.{});
@@ -20,8 +23,15 @@ pub fn build(b: *std.build.Builder) !void {
     sqlite.addIncludeDir("third_party/zig-sqlite/c");
     sqlite.linkLibC();
 
+    const zlib = libzlib.create(b, target, mode);
+    const mbedtls = libmbedtls.create(b, target, mode);
+    const ssh2 = libssh2.create(b, target, mode);
     const curl = try libcurl.create(b, target, mode);
-    curl.step.addIncludeDir("/usr/include");
+
+    mbedtls.link(ssh2.step);
+    ssh2.link(curl.step);
+    zlib.link(curl.step, .{});
+    mbedtls.link(curl.step);
 
     //
 
@@ -49,6 +59,9 @@ pub fn build(b: *std.build.Builder) !void {
     exe.linkLibrary(sqlite);
     exe.addIncludeDir("third_party/zig-sqlite/c");
     exe.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+    mbedtls.link(exe);
+    ssh2.link(exe);
+    zlib.link(exe, .{});
     curl.link(exe, .{ .import_name = "curl" });
     exe.install();
 
