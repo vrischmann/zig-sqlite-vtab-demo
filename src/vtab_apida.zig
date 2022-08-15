@@ -11,7 +11,6 @@ pub const Table = struct {
     pub const Cursor = TableCursor;
 
     arena_state: std.heap.ArenaAllocator.State,
-
     schema: [:0]const u8,
 
     pub const InitError = error{} || mem.Allocator.Error || fmt.ParseIntError;
@@ -29,7 +28,12 @@ pub const Table = struct {
         // Build the schema
 
         res.schema = try allocator.dupeZ(u8,
-            \\CREATE TABLE foobar(foo TEXT)
+            \\CREATE TABLE x(
+            \\  commune TEXT,
+            \\  code_postal INTEGER,
+            \\  code_département INTEGER,
+            \\  code_région INTEGER
+            \\)
         );
 
         res.arena_state = arena.state;
@@ -101,7 +105,10 @@ pub const TableCursor = struct {
 
         switch (column_number) {
             0 => return cursor.pos * 2,
-            else => return error.InvalidColumn,
+            else => {
+                diags.setErrorMessage("column number {d} is invalid", .{column_number});
+                return error.InvalidColumn;
+            },
         }
     }
 

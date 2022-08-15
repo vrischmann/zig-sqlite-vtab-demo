@@ -1,4 +1,5 @@
 const std = @import("std");
+const debug = std.debug;
 
 const sqlite = @import("sqlite");
 
@@ -23,4 +24,27 @@ pub fn main() anyerror!void {
     };
 
     try db.createVirtualTable("apida", &module_context, apida.Table);
+
+    var diags = sqlite.Diagnostics{};
+    errdefer {
+        debug.print("diags: {s}\n", .{diags});
+    }
+
+    try db.exec("CREATE VIRTUAL TABLE découpage_administratif USING apida", .{ .diags = &diags }, .{});
+
+    //
+
+    var stmt = try db.prepareWithDiags("SELECT commune FROM découpage_administratif WHERE code_département = ?{usize}", .{ .diags = &diags });
+    defer stmt.deinit();
+
+    var iter = try stmt.iterator([]const u8, .{@as(usize, 67)});
+
+    var row_arena = std.heap.ArenaAllocator.init(allocator);
+    defer row_arena.deinit();
+
+    var count: usize = 0;
+    while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
+        debug.print("row: {s}\n", .{row});
+        count += 1;
+    }
 }
