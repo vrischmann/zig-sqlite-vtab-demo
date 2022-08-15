@@ -21,6 +21,7 @@ pub fn build(b: *std.build.Builder) !void {
     sqlite.linkLibC();
 
     const curl = try libcurl.create(b, target, mode);
+    curl.step.addIncludeDir("/usr/include");
 
     //
 
