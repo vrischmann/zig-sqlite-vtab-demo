@@ -68,7 +68,7 @@ pub const TableCursor = struct {
         return res;
     }
 
-    const FilterError = error{} || sqlite.vtab.VTabDiagnostics.SetErrorMessageError;
+    const FilterError = error{};
 
     pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier) FilterError!void {
         _ = cursor;
@@ -76,7 +76,7 @@ pub const TableCursor = struct {
         _ = index;
     }
 
-    pub const NextError = error{} || sqlite.vtab.VTabDiagnostics.SetErrorMessageError;
+    pub const NextError = error{};
 
     pub fn next(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) NextError!void {
         _ = diags;
@@ -84,7 +84,7 @@ pub const TableCursor = struct {
         cursor.pos += 1;
     }
 
-    pub const HasNextError = error{} || sqlite.vtab.VTabDiagnostics.SetErrorMessageError;
+    pub const HasNextError = error{};
 
     pub fn hasNext(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) HasNextError!bool {
         _ = diags;
@@ -92,7 +92,7 @@ pub const TableCursor = struct {
         return cursor.pos < 20;
     }
 
-    pub const ColumnError = error{InvalidColumn} || sqlite.vtab.VTabDiagnostics.SetErrorMessageError;
+    pub const ColumnError = error{InvalidColumn};
 
     pub const Column = isize;
 
@@ -105,7 +105,7 @@ pub const TableCursor = struct {
         }
     }
 
-    pub const RowIDError = error{} || sqlite.vtab.VTabDiagnostics.SetErrorMessageError;
+    pub const RowIDError = error{};
 
     pub fn rowId(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) RowIDError!i64 {
         _ = diags;
