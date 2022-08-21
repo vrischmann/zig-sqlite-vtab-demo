@@ -180,7 +180,6 @@ pub const TableCursor = struct {
 
         if (cursor.data.len <= 0) {
             cursor.data_arena.deinit();
-            errdefer cursor.data_arena.deinit();
 
             const endpoint = if (index.num == 100)
                 try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{
