@@ -18,7 +18,7 @@ const GeoDataEntry = struct {
 };
 
 const towns_endpoint = "https://geo.api.gouv.fr/communes";
-const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{d}/communes";
+const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{s}/communes";
 
 /// Direct mapping to the JSON returned by the API
 const GeoDataJSONEntry = struct {
@@ -131,6 +131,15 @@ pub const Table = struct {
         _ = table;
         _ = diags;
 
+        // We can only use the departement code for filtering.
+        for (builder.constraints) |*constraint| {
+            if (constraint.op == .eq and constraint.column == 2) {
+                constraint.usage.argv_index = 1;
+                builder.id.num = 100;
+                break;
+            }
+        }
+
         builder.build();
     }
 };
@@ -152,7 +161,7 @@ pub const TableCursor = struct {
             .parent = parent,
             .data_arena = std.heap.ArenaAllocator.init(gpa),
             .data = &[_]GeoDataEntry{},
-            .pos = 204,
+            .pos = 0,
         };
         return res;
     }
@@ -164,20 +173,28 @@ pub const TableCursor = struct {
 
     pub const FilterError = error{} || FetchAllGeoDataError;
 
-    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier) FilterError!void {
+    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, args: []sqlite.vtab.FilterArg) FilterError!void {
         _ = cursor;
         _ = diags;
         _ = index;
 
-        // TODO(vincent): use the index data
-
         if (cursor.data.len <= 0) {
             cursor.data_arena.deinit();
-            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), towns_endpoint) catch |err| {
+            errdefer cursor.data_arena.deinit();
+
+            const endpoint = if (index.num == 100)
+                try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{
+                    args[0].as([]const u8),
+                })
+            else
+                towns_endpoint;
+
+            debug.print("endpoint: {s}\n", .{endpoint});
+
+            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), endpoint) catch |err| {
                 debug.print("fetchAllGeoData failed, err: {}\n", .{err});
                 return err;
             };
-            errdefer cursor.data_arena.deinit();
         }
     }
 
@@ -207,8 +224,6 @@ pub const TableCursor = struct {
     };
 
     pub fn column(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, column_number: i32) ColumnError!Column {
-        _ = diags;
-
         const entry = cursor.data[cursor.pos];
 
         switch (column_number) {
