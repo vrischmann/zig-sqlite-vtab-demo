@@ -54,4 +54,6 @@ pub fn main() anyerror!void {
         debug.print("row: {s}\n", .{row});
         count += 1;
     }
+
+    debug.print("count: {d}\n", .{count});
 }
