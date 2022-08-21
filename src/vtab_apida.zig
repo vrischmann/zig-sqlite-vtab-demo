@@ -18,7 +18,7 @@ const GeoDataEntry = struct {
 };
 
 const towns_endpoint = "https://geo.api.gouv.fr/communes";
-const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{d}/communes";
+const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{s}/communes";
 
 /// Direct mapping to the JSON returned by the API
 const GeoDataJSONEntry = struct {
@@ -164,7 +164,7 @@ pub const TableCursor = struct {
 
     pub const FilterError = error{} || FetchAllGeoDataError;
 
-    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, arg: []const u8) FilterError!void {
+    pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, args: []sqlite.vtab.FilterArg) FilterError!void {
         _ = cursor;
         _ = diags;
         _ = index;
@@ -174,7 +174,9 @@ pub const TableCursor = struct {
             errdefer cursor.data_arena.deinit();
 
             const endpoint = if (index.num == 100)
-                try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{arg})
+                try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{
+                    args[0].as([]const u8),
+                })
             else
                 towns_endpoint;
 
