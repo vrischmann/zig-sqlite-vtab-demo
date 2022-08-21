@@ -57,6 +57,7 @@ pub fn build(b: *std.build.Builder) !void {
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.linkLibrary(sqlite);
+    exe.use_stage1 = true;
     exe.addIncludeDir("third_party/zig-sqlite/c");
     exe.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
     mbedtls.link(exe);
