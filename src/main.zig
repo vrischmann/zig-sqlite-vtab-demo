@@ -64,17 +64,22 @@ pub fn main() anyerror!void {
     var row_arena = std.heap.ArenaAllocator.init(allocator);
     defer row_arena.deinit();
 
+    const Row = struct {
+        town: []const u8,
+        population: usize,
+    };
+
     if (departement_code) |dc| {
         debug.print("getting all towns for departement code {s}\n", .{dc});
 
-        var stmt = try db.prepareWithDiags("SELECT town FROM mytable WHERE departement_code = ?{[]const u8}", .{ .diags = &diags });
+        var stmt = try db.prepareWithDiags("SELECT town, population FROM mytable WHERE departement_code = ?{[]const u8}", .{ .diags = &diags });
         defer stmt.deinit();
 
-        var iter = try stmt.iterator([]const u8, .{dc});
+        var iter = try stmt.iterator(Row, .{dc});
 
         var count: usize = 0;
         while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
-            debug.print("row: {s}\n", .{row});
+            debug.print("town: {s}, population: {d}\n", .{ row.town, row.population });
             count += 1;
         }
 
@@ -82,14 +87,14 @@ pub fn main() anyerror!void {
     } else {
         debug.print("getting all towns for all departements\n", .{});
 
-        var stmt = try db.prepareWithDiags("SELECT town FROM mytable", .{ .diags = &diags });
+        var stmt = try db.prepareWithDiags("SELECT town, population FROM mytable", .{ .diags = &diags });
         defer stmt.deinit();
 
-        var iter = try stmt.iterator([]const u8, .{});
+        var iter = try stmt.iterator(Row, .{});
 
         var count: usize = 0;
         while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
-            debug.print("row: {s}\n", .{row});
+            debug.print("town: {s}, population: {d}\n", .{ row.town, row.population });
             count += 1;
         }
 

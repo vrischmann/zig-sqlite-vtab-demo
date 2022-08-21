@@ -15,6 +15,7 @@ const GeoDataEntry = struct {
     postal_code: isize,
     departement_code: []const u8,
     region_code: []const u8,
+    population: isize,
 };
 
 const towns_endpoint = "https://geo.api.gouv.fr/communes";
@@ -27,6 +28,7 @@ const GeoDataJSONEntry = struct {
     codeDepartement: []const u8,
     codeRegion: []const u8,
     codesPostaux: []const []const u8,
+    population: isize,
 };
 
 const FetchAllGeoDataError = error{
@@ -82,6 +84,7 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
                 0,
             .departement_code = raw_data.codeDepartement,
             .region_code = raw_data.codeRegion,
+            .population = raw_data.population,
         };
     }
 
@@ -115,7 +118,8 @@ pub const Table = struct {
             \\  town TEXT,
             \\  postal_code INTEGER,
             \\  departement_code INTEGER,
-            \\  region_code INTEGER
+            \\  region_code INTEGER,
+            \\  population INTEGER
             \\)
         );
 
@@ -227,6 +231,7 @@ pub const TableCursor = struct {
         postal_code: isize,
         departement_code: []const u8,
         region_code: []const u8,
+        population: isize,
     };
 
     pub fn column(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, column_number: i32) ColumnError!Column {
@@ -237,6 +242,7 @@ pub const TableCursor = struct {
             1 => return Column{ .postal_code = entry.postal_code },
             2 => return Column{ .departement_code = entry.departement_code },
             3 => return Column{ .region_code = entry.region_code },
+            4 => return Column{ .population = entry.population },
             else => {
                 diags.setErrorMessage("column number {d} is invalid", .{column_number});
                 return error.InvalidColumn;
