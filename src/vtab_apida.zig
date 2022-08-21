@@ -30,7 +30,7 @@ const GeoDataJSONEntry = struct {
 };
 
 const FetchAllGeoDataError = error{
-    HTTPRequestError,
+    InvalidStatusCode,
 } || mem.Allocator.Error || fmt.ParseIntError || json.ParseError([]GeoDataJSONEntry) || curl.Error;
 
 /// Fetch the Geo data. The endpoint must be either:
@@ -56,7 +56,11 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     try easy.setWriteData(&fifo);
     try easy.perform();
     const code = try easy.getResponseCode();
-    if (code != 200) return error.HTTPRequestError;
+    if (code != 200) {
+        debug.print("fetchAllGeoData: got status code {d}\n", .{code});
+        debug.print("fetchAllGeoData: response body is {s}\n", .{fifo.readableSlice(0)});
+        return error.InvalidStatusCode;
+    }
 
     //
 
@@ -174,27 +178,30 @@ pub const TableCursor = struct {
     pub const FilterError = error{} || FetchAllGeoDataError;
 
     pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, args: []sqlite.vtab.FilterArg) FilterError!void {
-        _ = cursor;
-        _ = diags;
-        _ = index;
+        cursor.data_arena.deinit();
 
-        if (cursor.data.len <= 0) {
-            cursor.data_arena.deinit();
+        const allocator = cursor.data_arena.allocator();
 
-            const endpoint = if (index.num == 100)
-                try fmt.allocPrintZ(cursor.data_arena.allocator(), towns_for_departement_endpoint, .{
-                    args[0].as([]const u8),
-                })
-            else
-                towns_endpoint;
+        // If an index is used try to filter by calling the appropriate API endpoint
+        if (index.num == 100) {
+            const endpoint = try fmt.allocPrintZ(allocator, towns_for_departement_endpoint, .{
+                args[0].as([]const u8),
+            });
+            defer allocator.free(endpoint);
 
-            debug.print("endpoint: {s}\n", .{endpoint});
-
-            cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), endpoint) catch |err| {
-                debug.print("fetchAllGeoData failed, err: {}\n", .{err});
-                return err;
-            };
+            if (fetchAllGeoData(allocator, endpoint)) |data| {
+                cursor.data = data;
+                debug.print("fetched data for endpoint {s}\n", .{endpoint});
+                return;
+            } else |err| {
+                debug.print("fetchAllGeoData for {s} failed, err: {}, falling back to generic endpoint\n", .{ endpoint, err });
+            }
         }
+
+        cursor.data = fetchAllGeoData(allocator, towns_endpoint) catch |err| {
+            diags.setErrorMessage("unable to fetch the Geo Data using the endpoint {s}, error is {}", .{ towns_endpoint, err });
+            return err;
+        };
     }
 
     pub const NextError = error{};
