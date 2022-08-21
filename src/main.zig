@@ -1,5 +1,6 @@
 const std = @import("std");
 const debug = std.debug;
+const mem = std.mem;
 
 const sqlite = @import("sqlite");
 const curl = @import("curl");
@@ -11,6 +12,7 @@ pub fn main() anyerror!void {
     defer if (gpa.deinit()) {
         std.debug.panic("leaks detected", .{});
     };
+    const allocator = gpa.allocator();
 
     // Initiailze curl
     try curl.globalInit();
@@ -18,7 +20,25 @@ pub fn main() anyerror!void {
 
     //
 
-    var allocator = gpa.allocator();
+    var departement_code: ?[]const u8 = null;
+
+    var raw_args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, raw_args);
+
+    var i: usize = 0;
+    while (i < raw_args.len) : (i += 1) {
+        const arg = raw_args[i];
+
+        if (mem.startsWith(u8, arg, "--departement-code=")) {
+            const pos = mem.indexOfScalar(u8, arg, '=').?;
+            departement_code = arg[pos + 1 ..];
+        } else if (mem.eql(u8, arg, "--departement-code")) {
+            i += 1;
+            departement_code = raw_args[i];
+        }
+    }
+
+    //
 
     var db = try sqlite.Db.init(.{
         .mode = sqlite.Db.Mode{ .Memory = {} },
@@ -41,19 +61,38 @@ pub fn main() anyerror!void {
 
     //
 
-    var stmt = try db.prepareWithDiags("SELECT town FROM mytable WHERE departement_code = ?{usize}", .{ .diags = &diags });
-    defer stmt.deinit();
-
-    var iter = try stmt.iterator([]const u8, .{@as(usize, 67)});
-
     var row_arena = std.heap.ArenaAllocator.init(allocator);
     defer row_arena.deinit();
 
-    var count: usize = 0;
-    while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
-        debug.print("row: {s}\n", .{row});
-        count += 1;
-    }
+    if (departement_code) |dc| {
+        debug.print("getting all towns for departement code {s}\n", .{dc});
 
-    debug.print("count: {d}\n", .{count});
+        var stmt = try db.prepareWithDiags("SELECT town FROM mytable WHERE departement_code = ?{[]const u8}", .{ .diags = &diags });
+        defer stmt.deinit();
+
+        var iter = try stmt.iterator([]const u8, .{dc});
+
+        var count: usize = 0;
+        while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
+            debug.print("row: {s}\n", .{row});
+            count += 1;
+        }
+
+        debug.print("count: {d}\n", .{count});
+    } else {
+        debug.print("getting all towns for all departements\n", .{});
+
+        var stmt = try db.prepareWithDiags("SELECT town FROM mytable", .{ .diags = &diags });
+        defer stmt.deinit();
+
+        var iter = try stmt.iterator([]const u8, .{});
+
+        var count: usize = 0;
+        while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
+            debug.print("row: {s}\n", .{row});
+            count += 1;
+        }
+
+        debug.print("count: {d}\n", .{count});
+    }
 }
