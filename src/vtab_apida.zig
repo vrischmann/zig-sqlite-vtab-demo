@@ -131,6 +131,15 @@ pub const Table = struct {
         _ = table;
         _ = diags;
 
+        // We can only use the departement code for filtering.
+        for (builder.constraints) |*constraint| {
+            if (constraint.op == .eq and constraint.column == 2) {
+                constraint.usage.argv_index = 1;
+                builder.id.num = 100;
+                break;
+            }
+        }
+
         builder.build();
     }
 };
@@ -152,7 +161,7 @@ pub const TableCursor = struct {
             .parent = parent,
             .data_arena = std.heap.ArenaAllocator.init(gpa),
             .data = &[_]GeoDataEntry{},
-            .pos = 204,
+            .pos = 0,
         };
         return res;
     }
@@ -179,6 +188,8 @@ pub const TableCursor = struct {
                 })
             else
                 towns_endpoint;
+
+            debug.print("endpoint: {s}\n", .{endpoint});
 
             cursor.data = fetchAllGeoData(cursor.data_arena.allocator(), endpoint) catch |err| {
                 debug.print("fetchAllGeoData failed, err: {}\n", .{err});
