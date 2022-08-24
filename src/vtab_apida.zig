@@ -9,10 +9,9 @@ const sqlite = @import("sqlite");
 const curl = @import("curl");
 const c = sqlite.c;
 
-const Position = struct {
-    longitude: f64,
-    latitude: f64,
-};
+const Position = @import("main.zig").Position;
+
+const logger = std.log.scoped(.vtab_apida);
 
 /// Internal type
 const GeoDataEntry = struct {
@@ -48,6 +47,12 @@ const FetchAllGeoDataError = error{
 /// * the general `towns_endpoint` which will return _all_ towns in France
 /// * a endpoint built using `towns_for_departement_endpoint` which will return all towns for a specific departement.
 fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeoDataError![]GeoDataEntry {
+    const start = std.time.milliTimestamp();
+    defer {
+        const now = std.time.milliTimestamp();
+        logger.debug("fetched data for endpoint \"{s}\" in {d}ms", .{ endpoint, now - start });
+    }
+
     // NOTE(vincent): don't release Zig-allocated resources here, we always pass an arena as allocator and handle errors in the calling function
 
     // Perform the HTTP request using curl
@@ -68,8 +73,8 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     try easy.perform();
     const code = try easy.getResponseCode();
     if (code != 200) {
-        debug.print("fetchAllGeoData: got status code {d}\n", .{code});
-        debug.print("fetchAllGeoData: response body is {s}\n", .{fifo.readableSlice(0)});
+        logger.warn("fetchAllGeoData: got status code {d}", .{code});
+        logger.warn("fetchAllGeoData: response body is {s}", .{fifo.readableSlice(0)});
         return error.InvalidStatusCode;
     }
 
@@ -154,15 +159,20 @@ pub const Table = struct {
         _ = table;
         _ = diags;
 
+        var id_str_writer = builder.id_str_buffer.writer();
+
         // We can only use the departement code for filtering.
+        var argv_index: i32 = 0;
         for (builder.constraints) |*constraint| {
-            if (constraint.op == .eq and constraint.column == 2) {
-                constraint.usage.argv_index = 1;
-                builder.id.num = 100;
-                break;
+            if (constraint.usable and constraint.op == .eq) {
+                argv_index += 1;
+                constraint.usage.argv_index = argv_index;
+
+                try id_str_writer.print("={d:<6}", .{constraint.column});
             }
         }
 
+        builder.id.str = builder.id_str_buffer.toOwnedSlice();
         builder.build();
     }
 };
@@ -194,7 +204,7 @@ pub const TableCursor = struct {
         cursor.allocator.destroy(cursor);
     }
 
-    pub const FilterError = error{} || FetchAllGeoDataError;
+    pub const FilterError = error{InvalidColumn} || FetchAllGeoDataError;
 
     pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, args: []sqlite.vtab.FilterArg) FilterError!void {
         cursor.data_arena.deinit();
@@ -202,23 +212,61 @@ pub const TableCursor = struct {
 
         const allocator = cursor.data_arena.allocator();
 
-        // If an index is used try to filter by calling the appropriate API endpoint
-        if (index.num == 100) {
-            const endpoint = try fmt.allocPrintZ(allocator, towns_for_departement_endpoint, .{
-                args[0].as([]const u8),
-            });
-            defer allocator.free(endpoint);
+        // Parse the index identifier
 
-            if (fetchAllGeoData(allocator, endpoint)) |data| {
-                cursor.data = data;
-                debug.print("fetched data for endpoint {s}\n", .{endpoint});
-                return;
-            } else |err| {
-                debug.print("fetchAllGeoData for {s} failed, err: {}, falling back to generic endpoint\n", .{ endpoint, err });
+        var town: ?[]const u8 = null;
+        var postal_code: ?[]const u8 = null;
+        var departement_code: ?[]const u8 = null;
+
+        var id = index.str;
+
+        var i: usize = 0;
+        while (true) {
+            const pos = mem.indexOfScalar(u8, id, '=') orelse break;
+
+            const arg = args[i];
+            i += 1;
+
+            // 3 chars for the '=' marker
+            // 6 chars because we format all columns in a 6 char wide string
+            const col_str = id[pos + 1 .. pos + 1 + 6];
+            const col = try fmt.parseInt(i32, mem.trimRight(u8, col_str, " "), 10);
+
+            id = id[pos + 1 + 6 ..];
+
+            //
+
+            if (col == 0) {
+                town = arg.as([]const u8);
+            } else if (col == 1) {
+                postal_code = arg.as([]const u8);
+            } else if (col == 2) {
+                departement_code = arg.as([]const u8);
             }
         }
 
-        cursor.data = fetchAllGeoData(allocator, towns_endpoint) catch |err| {
+        //
+
+        const endpoint = if (town) |s|
+            try mem.concatWithSentinel(allocator, u8, &[_][]const u8{
+                towns_endpoint,
+                "&nom=",
+                s,
+            }, 0)
+        else if (postal_code) |s|
+            try mem.concatWithSentinel(allocator, u8, &[_][]const u8{
+                towns_endpoint,
+                "&codePostal=",
+                s,
+            }, 0)
+        else if (departement_code) |s|
+            try fmt.allocPrintZ(allocator, towns_for_departement_endpoint, .{s})
+        else
+            towns_endpoint;
+
+        //
+
+        cursor.data = fetchAllGeoData(allocator, endpoint) catch |err| {
             diags.setErrorMessage("unable to fetch the Geo Data using the endpoint {s} error is {}", .{ towns_endpoint, err });
             return err;
         };

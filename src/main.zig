@@ -5,7 +5,15 @@ const mem = std.mem;
 const sqlite = @import("sqlite");
 const curl = @import("curl");
 
-const apida = @import("vtab_apida.zig");
+const vtab_apida = @import("vtab_apida.zig");
+const vtab_user = @import("vtab_user.zig");
+
+const logger = std.log.scoped(.main);
+
+pub const Position = struct {
+    longitude: f64,
+    latitude: f64,
+};
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -50,56 +58,58 @@ pub fn main() anyerror!void {
         .allocator = allocator,
     };
 
-    try db.createVirtualTable("apida", &module_context, apida.Table);
+    try db.createVirtualTable("apida", &module_context, vtab_apida.Table);
+    try db.createVirtualTable("user", &module_context, vtab_user.Table);
 
     var diags = sqlite.Diagnostics{};
     errdefer {
-        debug.print("diags: {s}\n", .{diags});
+        logger.err("diags: {s}", .{diags});
     }
 
-    try db.exec("CREATE VIRTUAL TABLE mytable USING apida", .{ .diags = &diags }, .{});
+    try db.exec("CREATE VIRTUAL TABLE decoupage_administratif USING apida", .{ .diags = &diags }, .{});
+    try db.exec("CREATE VIRTUAL TABLE user USING user(host=localhost, port=6379)", .{ .diags = &diags }, .{});
 
     //
 
-    var row_arena = std.heap.ArenaAllocator.init(allocator);
-    defer row_arena.deinit();
+    var n: usize = 0;
+    while (n < 2) : (n += 1) {
+        var row_arena = std.heap.ArenaAllocator.init(allocator);
+        defer row_arena.deinit();
 
-    const Row = struct {
-        town: []const u8,
-        longitude: f64,
-        latitude: f64,
-        population: usize,
-    };
-
-    if (departement_code) |dc| {
-        debug.print("getting all towns for departement code {s}\n", .{dc});
-
-        var stmt = try db.prepareWithDiags("SELECT town, longitude, latitude, population FROM mytable WHERE departement_code = ?{[]const u8}", .{ .diags = &diags });
+        var stmt = try db.prepareWithDiags(
+            \\SELECT u.rowid, u.id, u.name, u.postal_code, (
+            \\  SELECT group_concat(da.town) FROM decoupage_administratif da WHERE da.postal_code = u.postal_code
+            \\) AS town
+            \\FROM user u
+        ,
+            .{ .diags = &diags },
+        );
         defer stmt.deinit();
 
-        var iter = try stmt.iterator(Row, .{dc});
+        var iter = try stmt.iterator(
+            struct {
+                rowid: i64,
+                id: []const u8,
+                name: []const u8,
+                postal_code: f64,
+                town: []const u8,
+            },
+            .{},
+        );
 
         var count: usize = 0;
         while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
-            debug.print("town: {s} (lon:{d}, lat:{d}) population: {d}\n", .{ row.town, row.longitude, row.latitude, row.population });
+            logger.info("n#{d} row rowid={d} id=\"{s}\" name=\"{s}\": postal code: {d} town: \"{s}\"", .{
+                n,
+                row.rowid,
+                std.fmt.fmtSliceEscapeLower(row.id),
+                row.name,
+                row.postal_code,
+                row.town,
+            });
             count += 1;
         }
 
-        debug.print("count: {d}\n", .{count});
-    } else {
-        debug.print("getting all towns for all departements\n", .{});
-
-        var stmt = try db.prepareWithDiags("SELECT town, longitude, latitude, population FROM mytable", .{ .diags = &diags });
-        defer stmt.deinit();
-
-        var iter = try stmt.iterator(Row, .{});
-
-        var count: usize = 0;
-        while (try iter.nextAlloc(row_arena.allocator(), .{ .diags = &diags })) |row| {
-            debug.print("town: {s} (lon:{d}, lat:{d}) population: {d}\n", .{ row.town, row.longitude, row.latitude, row.population });
-            count += 1;
-        }
-
-        debug.print("count: {d}\n", .{count});
+        logger.info("n#{d} count: {d}", .{ n, count });
     }
 }
