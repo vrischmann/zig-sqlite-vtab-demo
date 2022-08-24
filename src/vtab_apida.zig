@@ -9,6 +9,11 @@ const sqlite = @import("sqlite");
 const curl = @import("curl");
 const c = sqlite.c;
 
+const Position = struct {
+    longitude: f64,
+    latitude: f64,
+};
+
 /// Internal type
 const GeoDataEntry = struct {
     town: []const u8,
@@ -16,10 +21,11 @@ const GeoDataEntry = struct {
     departement_code: []const u8,
     region_code: []const u8,
     population: isize,
+    position: Position,
 };
 
-const towns_endpoint = "https://geo.api.gouv.fr/communes";
-const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{s}/communes";
+const towns_endpoint = "https://geo.api.gouv.fr/communes?fields=nom,code,codeDepartement,codeRegion,codesPostaux,population,centre";
+const towns_for_departement_endpoint = "https://geo.api.gouv.fr/departements/{s}/communes?fields=nom,code,codeDepartement,codeRegion,codesPostaux,population,centre";
 
 /// Direct mapping to the JSON returned by the API
 const GeoDataJSONEntry = struct {
@@ -28,7 +34,10 @@ const GeoDataJSONEntry = struct {
     codeDepartement: []const u8,
     codeRegion: []const u8,
     codesPostaux: []const []const u8,
-    population: isize,
+    population: ?isize = null,
+    centre: struct {
+        coordinates: [2]f64,
+    },
 };
 
 const FetchAllGeoDataError = error{
@@ -84,7 +93,11 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
                 0,
             .departement_code = raw_data.codeDepartement,
             .region_code = raw_data.codeRegion,
-            .population = raw_data.population,
+            .population = raw_data.population orelse 0,
+            .position = .{
+                .longitude = raw_data.centre.coordinates[0],
+                .latitude = raw_data.centre.coordinates[1],
+            },
         };
     }
 
@@ -119,7 +132,9 @@ pub const Table = struct {
             \\  postal_code INTEGER,
             \\  departement_code INTEGER,
             \\  region_code INTEGER,
-            \\  population INTEGER
+            \\  population INTEGER,
+            \\  longitude REAL,
+            \\  latitude REAL
             \\)
         );
 
@@ -203,7 +218,7 @@ pub const TableCursor = struct {
         }
 
         cursor.data = fetchAllGeoData(allocator, towns_endpoint) catch |err| {
-            diags.setErrorMessage("unable to fetch the Geo Data using the endpoint {s}, error is {}", .{ towns_endpoint, err });
+            diags.setErrorMessage("unable to fetch the Geo Data using the endpoint {s} error is {}", .{ towns_endpoint, err });
             return err;
         };
     }
@@ -232,6 +247,8 @@ pub const TableCursor = struct {
         departement_code: []const u8,
         region_code: []const u8,
         population: isize,
+        longitude: f64,
+        latitude: f64,
     };
 
     pub fn column(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, column_number: i32) ColumnError!Column {
@@ -243,6 +260,8 @@ pub const TableCursor = struct {
             2 => return Column{ .departement_code = entry.departement_code },
             3 => return Column{ .region_code = entry.region_code },
             4 => return Column{ .population = entry.population },
+            5 => return Column{ .longitude = entry.position.longitude },
+            6 => return Column{ .latitude = entry.position.latitude },
             else => {
                 diags.setErrorMessage("column number {d} is invalid", .{column_number});
                 return error.InvalidColumn;
