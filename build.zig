@@ -58,12 +58,19 @@ pub fn build(b: *std.build.Builder) !void {
     exe.setBuildMode(mode);
     exe.linkLibrary(sqlite);
     exe.use_stage1 = true;
+
     exe.addIncludeDir("third_party/zig-sqlite/c");
     exe.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+
     mbedtls.link(exe);
     ssh2.link(exe);
     zlib.link(exe, .{});
     curl.link(exe, .{ .import_name = "curl" });
+
+    exe.addIncludeDir("/usr/include");
+    exe.addLibraryPath("/usr/lib64");
+    exe.linkSystemLibrary("hiredis");
+
     exe.install();
 
     const run_cmd = exe.run();
