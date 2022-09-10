@@ -20,17 +20,24 @@ pub fn build(b: *std.build.Builder) !void {
 
     //
 
-    if (false) {
+    if (true) {
         const vtab_apida_ext = b.addSharedLibrary("apida", "src/vtab_apida_ext.zig", .unversioned);
         vtab_apida_ext.force_pic = true;
         vtab_apida_ext.setTarget(target);
         vtab_apida_ext.setBuildMode(mode);
+        vtab_apida_ext.use_stage1 = true;
+
+        vtab_apida_ext.addIncludePath("third_party/zig-sqlite/c");
+        vtab_apida_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+
+        vtab_apida_ext.install();
+
         vtab_apida_ext.addIncludePath("/usr/include");
         vtab_apida_ext.addLibraryPath("/usr/lib64");
-        vtab_apida_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
-        vtab_apida_ext.linkSystemLibrary("sqlite3");
-        vtab_apida_ext.linkLibC();
-        vtab_apida_ext.install();
+
+        vtab_apida_ext.linkLibrary(sqlite);
+        vtab_apida_ext.linkSystemLibrary("hiredis");
+        vtab_apida_ext.linkSystemLibrary("curl");
 
         const vtab_apida_ext_options = b.addOptions();
         vtab_apida_ext.addOptions("build_options", vtab_apida_ext_options);
@@ -41,7 +48,6 @@ pub fn build(b: *std.build.Builder) !void {
     const exe = b.addExecutable("zig-sqlite-demo", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.linkLibrary(sqlite);
     exe.use_stage1 = true;
 
     exe.addIncludePath("third_party/zig-sqlite/c");
@@ -49,6 +55,8 @@ pub fn build(b: *std.build.Builder) !void {
 
     exe.addIncludePath("/usr/include");
     exe.addLibraryPath("/usr/lib64");
+
+    exe.linkLibrary(sqlite);
     exe.linkSystemLibrary("hiredis");
     exe.linkSystemLibrary("curl");
 
@@ -59,7 +67,4 @@ pub fn build(b: *std.build.Builder) !void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
 }
