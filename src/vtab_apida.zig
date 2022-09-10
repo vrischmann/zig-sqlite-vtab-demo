@@ -198,6 +198,7 @@ pub const TableCursor = struct {
 
     pub fn filter(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics, index: sqlite.vtab.IndexIdentifier, args: []sqlite.vtab.FilterArg) FilterError!void {
         cursor.data_arena.deinit();
+        cursor.data_arena = std.heap.ArenaAllocator.init(cursor.allocator);
 
         const allocator = cursor.data_arena.allocator();
 
