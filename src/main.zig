@@ -3,7 +3,7 @@ const debug = std.debug;
 const mem = std.mem;
 
 const sqlite = @import("sqlite");
-const curl = @import("curl");
+const curl = @import("curl.zig");
 
 const vtab_apida = @import("vtab_apida.zig");
 const vtab_user = @import("vtab_user.zig");
@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
     const allocator = gpa.allocator();
 
     // Initiailze curl
-    try curl.globalInit();
+    curl.globalInit();
     defer curl.globalCleanup();
 
     //

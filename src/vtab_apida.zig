@@ -6,8 +6,7 @@ const json = std.json;
 const mem = std.mem;
 
 const sqlite = @import("sqlite");
-const curl = @import("curl");
-const c = sqlite.c;
+const curl = @import("curl.zig");
 
 const Position = @import("main.zig").Position;
 
@@ -56,31 +55,20 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     // NOTE(vincent): don't release Zig-allocated resources here, we always pass an arena as allocator and handle errors in the calling function
 
     // Perform the HTTP request using curl
+    var client = try curl.Client.init();
+    defer client.deinit();
 
-    const Fifo = std.fifo.LinearFifo(u8, .{ .Dynamic = {} });
+    const response = try client.get(allocator, endpoint);
 
-    var fifo = Fifo.init(allocator);
-    try fifo.ensureTotalCapacity(40000);
-
-    var easy = try curl.Easy.init();
-    defer easy.cleanup();
-
-    try easy.setUrl(endpoint);
-    try easy.setSslVerifyPeer(false);
-    try easy.setAcceptEncodingGzip();
-    try easy.setWriteFn(curl.writeToFifo(Fifo));
-    try easy.setWriteData(&fifo);
-    try easy.perform();
-    const code = try easy.getResponseCode();
-    if (code != 200) {
-        logger.warn("fetchAllGeoData: got status code {d}", .{code});
-        logger.warn("fetchAllGeoData: response body is {s}", .{fifo.readableSlice(0)});
+    if (response.status != 200) {
+        logger.warn("fetchAllGeoData: got status code {d}", .{response.status});
+        logger.warn("fetchAllGeoData: response body is {s}", .{response.body});
         return error.InvalidStatusCode;
     }
 
     //
 
-    var token_stream = json.TokenStream.init(fifo.readableSlice(0));
+    var token_stream = json.TokenStream.init(response.body);
     const data = try json.parse([]GeoDataJSONEntry, &token_stream, .{
         .allocator = allocator,
         .ignore_unknown_fields = true,
@@ -113,10 +101,9 @@ pub const Table = struct {
     pub const Cursor = TableCursor;
 
     arena_state: std.heap.ArenaAllocator.State,
-    curl: *curl.Easy,
     schema: [:0]const u8,
 
-    pub const InitError = error{} || mem.Allocator.Error || fmt.ParseIntError || curl.Error;
+    pub const InitError = error{} || mem.Allocator.Error || fmt.ParseIntError;
 
     pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const []const u8) InitError!*Table {
         _ = diags;
@@ -127,8 +114,6 @@ pub const Table = struct {
 
         var res = try allocator.create(Table);
         errdefer res.deinit(gpa);
-
-        res.curl = try curl.Easy.init();
 
         // Build the schema
         res.schema = try allocator.dupeZ(u8,
@@ -149,7 +134,6 @@ pub const Table = struct {
     }
 
     pub fn deinit(table: *Table, gpa: mem.Allocator) void {
-        table.curl.cleanup();
         table.arena_state.promote(gpa).deinit();
     }
 
