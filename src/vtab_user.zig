@@ -24,7 +24,7 @@ pub const Table = struct {
         RedisConnectError,
     } || mem.Allocator.Error || fmt.ParseIntError;
 
-    pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const []const u8) InitError!*Table {
+    pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const sqlite.vtab.ModuleArgument) InitError!*Table {
         _ = diags;
         _ = args;
 
@@ -38,12 +38,15 @@ pub const Table = struct {
         var host: []const u8 = "localhost";
         var port: c_int = 6379;
         for (args) |arg| {
-            if (mem.startsWith(u8, arg, "host=")) {
-                const pos = mem.indexOfScalar(u8, arg, '=') orelse unreachable;
-                host = arg[pos + 1 ..];
-            } else if (mem.startsWith(u8, arg, "port=")) {
-                const pos = mem.indexOfScalar(u8, arg, '=') orelse unreachable;
-                port = try fmt.parseInt(c_int, arg[pos + 1 ..], 10);
+            switch (arg) {
+                .plain => {},
+                .kv => |kv| {
+                    if (mem.eql(u8, kv.key, "host")) {
+                        host = kv.value;
+                    } else if (mem.eql(u8, kv.key, "port")) {
+                        port = try fmt.parseInt(c_int, kv.value, 10);
+                    }
+                },
             }
         }
 

@@ -105,7 +105,7 @@ pub const Table = struct {
 
     pub const InitError = error{} || mem.Allocator.Error || fmt.ParseIntError;
 
-    pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const []const u8) InitError!*Table {
+    pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const sqlite.vtab.ModuleArgument) InitError!*Table {
         _ = diags;
         _ = args;
 
