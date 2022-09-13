@@ -25,9 +25,6 @@ pub const Table = struct {
     } || mem.Allocator.Error || fmt.ParseIntError;
 
     pub fn init(gpa: mem.Allocator, diags: *sqlite.vtab.VTabDiagnostics, args: []const sqlite.vtab.ModuleArgument) InitError!*Table {
-        _ = diags;
-        _ = args;
-
         var arena = std.heap.ArenaAllocator.init(gpa);
         const allocator = arena.allocator();
 
@@ -215,8 +212,6 @@ pub const TableCursor = struct {
     pub const HasNextError = error{} || SendScanCommandError;
 
     pub fn hasNext(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) HasNextError!bool {
-        _ = diags;
-
         const allocator = cursor.data_arena.allocator();
 
         // Fastpath if there's more to read in the current reply
