@@ -15,7 +15,7 @@ pub fn build(b: *std.build.Builder) !void {
     });
     sqlite.setTarget(target);
     sqlite.setBuildMode(mode);
-    sqlite.addIncludeDir("third_party/zig-sqlite/c");
+    sqlite.addIncludePath("third_party/zig-sqlite/c");
     sqlite.linkLibC();
 
     //
@@ -25,7 +25,7 @@ pub fn build(b: *std.build.Builder) !void {
         vtab_apida_ext.force_pic = true;
         vtab_apida_ext.setTarget(target);
         vtab_apida_ext.setBuildMode(mode);
-        vtab_apida_ext.addIncludeDir("/usr/include");
+        vtab_apida_ext.addIncludePath("/usr/include");
         vtab_apida_ext.addLibraryPath("/usr/lib64");
         vtab_apida_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
         vtab_apida_ext.linkSystemLibrary("sqlite3");
@@ -44,10 +44,10 @@ pub fn build(b: *std.build.Builder) !void {
     exe.linkLibrary(sqlite);
     exe.use_stage1 = true;
 
-    exe.addIncludeDir("third_party/zig-sqlite/c");
+    exe.addIncludePath("third_party/zig-sqlite/c");
     exe.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
 
-    exe.addIncludeDir("/usr/include");
+    exe.addIncludePath("/usr/include");
     exe.addLibraryPath("/usr/lib64");
     exe.linkSystemLibrary("hiredis");
     exe.linkSystemLibrary("curl");
