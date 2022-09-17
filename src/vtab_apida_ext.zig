@@ -19,9 +19,7 @@ var module_allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 var module_context: sqlite.vtab.ModuleContext = undefined;
 
 pub export fn sqlite3_apida_init(db: *c.sqlite3, err_msg: [*c][*c]u8, api: *c.sqlite3_api_routines) callconv(.C) c_int {
-    _ = db;
     _ = err_msg;
-    _ = api;
 
     c.sqlite3_api = api;
 
