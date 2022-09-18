@@ -106,6 +106,7 @@ pub const TableCursor = struct {
     redis_cursor: *c.redisReply,
     redis_array: *c.redisReply,
     redis_array_pos: usize = 0,
+    row_id: i64 = 0,
 
     pub const InitError = error{} || mem.Allocator.Error;
 
@@ -207,6 +208,7 @@ pub const TableCursor = struct {
     pub fn next(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) NextError!void {
         _ = diags;
         cursor.redis_array_pos += 1;
+        cursor.row_id += 1;
     }
 
     pub const HasNextError = error{} || SendScanCommandError;
@@ -316,6 +318,6 @@ pub const TableCursor = struct {
     pub fn rowId(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) RowIDError!i64 {
         _ = diags;
 
-        return @intCast(i64, cursor.redis_array_pos);
+        return @intCast(i64, cursor.row_id);
     }
 };
