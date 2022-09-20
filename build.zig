@@ -20,28 +20,48 @@ pub fn build(b: *std.build.Builder) !void {
 
     //
 
-    if (true) {
-        const vtab_apida_ext = b.addSharedLibrary("apida", "src/vtab_apida_ext.zig", .unversioned);
-        vtab_apida_ext.force_pic = true;
-        vtab_apida_ext.setTarget(target);
-        vtab_apida_ext.setBuildMode(mode);
-        vtab_apida_ext.use_stage1 = true;
+    const vtab_apida_ext = b.addSharedLibrary("apida", "src/vtab_apida_ext.zig", .unversioned);
+    vtab_apida_ext.force_pic = true;
+    vtab_apida_ext.setTarget(target);
+    vtab_apida_ext.setBuildMode(mode);
+    vtab_apida_ext.use_stage1 = true;
 
-        vtab_apida_ext.addIncludePath("third_party/zig-sqlite/c");
-        vtab_apida_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+    vtab_apida_ext.addIncludePath("third_party/zig-sqlite/c");
+    vtab_apida_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
 
-        vtab_apida_ext.install();
+    vtab_apida_ext.install();
 
-        vtab_apida_ext.addIncludePath("/usr/include");
-        vtab_apida_ext.addLibraryPath("/usr/lib64");
+    vtab_apida_ext.addIncludePath("/usr/include");
+    vtab_apida_ext.addLibraryPath("/usr/lib64");
 
-        vtab_apida_ext.linkLibrary(sqlite);
-        vtab_apida_ext.linkSystemLibrary("hiredis");
-        vtab_apida_ext.linkSystemLibrary("curl");
+    vtab_apida_ext.linkLibrary(sqlite);
+    vtab_apida_ext.linkSystemLibrary("curl");
 
-        const vtab_apida_ext_options = b.addOptions();
-        vtab_apida_ext.addOptions("build_options", vtab_apida_ext_options);
-    }
+    const vtab_apida_ext_options = b.addOptions();
+    vtab_apida_ext.addOptions("build_options", vtab_apida_ext_options);
+
+    //
+
+    const vtab_user_ext = b.addSharedLibrary("user", "src/vtab_user_ext.zig", .unversioned);
+    vtab_user_ext.force_pic = true;
+    vtab_user_ext.setTarget(target);
+    vtab_user_ext.setBuildMode(mode);
+    vtab_user_ext.use_stage1 = true;
+
+    vtab_user_ext.addIncludePath("third_party/zig-sqlite/c");
+    vtab_user_ext.addPackagePath("sqlite", "third_party/zig-sqlite/sqlite.zig");
+
+    vtab_user_ext.install();
+
+    vtab_user_ext.addIncludePath("/usr/include");
+    vtab_user_ext.addLibraryPath("/usr/lib64");
+
+    vtab_user_ext.linkLibrary(sqlite);
+    vtab_user_ext.linkSystemLibrary("hiredis");
+    vtab_user_ext.linkSystemLibrary("curl");
+
+    const vtab_user_ext_options = b.addOptions();
+    vtab_user_ext.addOptions("build_options", vtab_user_ext_options);
 
     //
 
