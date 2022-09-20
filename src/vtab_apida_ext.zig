@@ -3,6 +3,7 @@ const std = @import("std");
 const sqlite = @import("sqlite");
 const c = sqlite.c;
 
+const curl = @import("curl.zig");
 const apida = @import("vtab_apida.zig");
 
 const name = "apida";
@@ -16,6 +17,9 @@ pub export fn sqlite3_apida_init(db: *c.sqlite3, err_msg: [*c][*c]u8, api: *c.sq
     _ = err_msg;
 
     c.sqlite3_api = api;
+
+    curl.globalInit();
+    defer curl.globalCleanup();
 
     const VirtualTableType = sqlite.vtab.VirtualTable(name, apida.Table);
 
