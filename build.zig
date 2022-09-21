@@ -58,7 +58,6 @@ pub fn build(b: *std.build.Builder) !void {
 
     vtab_user_ext.linkLibrary(sqlite);
     vtab_user_ext.linkSystemLibrary("hiredis");
-    vtab_user_ext.linkSystemLibrary("curl");
 
     const vtab_user_ext_options = b.addOptions();
     vtab_user_ext.addOptions("build_options", vtab_user_ext_options);
