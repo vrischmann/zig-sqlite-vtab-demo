@@ -152,7 +152,8 @@ pub const Table = struct {
                 argv_index += 1;
                 constraint.usage.argv_index = argv_index;
 
-                try id_str_writer.print("={d:<6}", .{constraint.column});
+                if (argv_index > 0) try id_str_writer.writeByte('|');
+                try id_str_writer.print("{d}", .{constraint.column});
             }
         }
 
@@ -204,22 +205,12 @@ pub const TableCursor = struct {
 
         var id = index.str;
 
+        var token_iterator = mem.tokenize(u8, id, "|");
         var i: usize = 0;
-        while (true) {
-            const pos = mem.indexOfScalar(u8, id, '=') orelse break;
-
+        while (token_iterator.next()) |token| {
             const arg = args[i];
-            i += 1;
 
-            // 3 chars for the '=' marker
-            // 6 chars because we format all columns in a 6 char wide string
-            const col_str = id[pos + 1 .. pos + 1 + 6];
-            const col = try fmt.parseInt(i32, mem.trimRight(u8, col_str, " "), 10);
-
-            id = id[pos + 1 + 6 ..];
-
-            //
-
+            const col = try fmt.parseInt(i32, mem.trimRight(u8, token, " "), 10);
             if (col == 0) {
                 town = arg.as([]const u8);
             } else if (col == 1) {
@@ -227,6 +218,8 @@ pub const TableCursor = struct {
             } else if (col == 2) {
                 departement_code = arg.as([]const u8);
             }
+
+            i += 1;
         }
 
         //
