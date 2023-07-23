@@ -144,21 +144,21 @@ pub const TableCursor = struct {
 
         if (c.redisCommand(cursor.parent.redis, command)) |reply| {
             // Do some sanity checks
-            const redis_reply = @ptrCast(*c.redisReply, @alignCast(@sizeOf(*c.redisReply), reply));
-            if (redis_reply.@"type" != c.REDIS_REPLY_ARRAY) {
-                diags.setErrorMessage("expected redis reply type \"multi bulk reply\", got {d}", .{redis_reply.@"type"});
+            const redis_reply = @as(*c.redisReply, @ptrCast(@alignCast(reply)));
+            if (redis_reply.type != c.REDIS_REPLY_ARRAY) {
+                diags.setErrorMessage("expected redis reply type \"multi bulk reply\", got {d}", .{redis_reply.type});
                 return error.ReplyNotAnArray;
             }
             if (redis_reply.elements != 2) {
                 diags.setErrorMessage("expected 2 reply in multi bulk reply for SCAN command, got {d}", .{redis_reply.elements});
                 return error.ReplyInvalid;
             }
-            if (redis_reply.element[0].*.@"type" != c.REDIS_REPLY_STRING) {
-                diags.setErrorMessage("expected first element of reply to be a string, got {d}", .{redis_reply.element[0].*.@"type"});
+            if (redis_reply.element[0].*.type != c.REDIS_REPLY_STRING) {
+                diags.setErrorMessage("expected first element of reply to be a string, got {d}", .{redis_reply.element[0].*.type});
                 return error.ReplyNotAString;
             }
-            if (redis_reply.element[1].*.@"type" != c.REDIS_REPLY_ARRAY) {
-                diags.setErrorMessage("expected second element of reply to be an array, got {d}", .{redis_reply.element[0].*.@"type"});
+            if (redis_reply.element[1].*.type != c.REDIS_REPLY_ARRAY) {
+                diags.setErrorMessage("expected second element of reply to be an array, got {d}", .{redis_reply.element[0].*.type});
                 return error.ReplyNotAString;
             }
 
@@ -251,9 +251,9 @@ pub const TableCursor = struct {
 
         if (c.redisCommand(cursor.parent.redis, command)) |reply| {
             // Do some sanity checks
-            const redis_reply = @ptrCast(*c.redisReply, @alignCast(@sizeOf(*c.redisReply), reply));
-            if (redis_reply.@"type" != c.REDIS_REPLY_STRING) {
-                diags.setErrorMessage("expected redis reply type \"string\", got {d}", .{redis_reply.@"type"});
+            const redis_reply = @as(*c.redisReply, @ptrCast(@alignCast(reply)));
+            if (redis_reply.type != c.REDIS_REPLY_STRING) {
+                diags.setErrorMessage("expected redis reply type \"string\", got {d}", .{redis_reply.type});
                 return error.ReplyNotAnArray;
             }
 
@@ -318,6 +318,6 @@ pub const TableCursor = struct {
     pub fn rowId(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) RowIDError!i64 {
         _ = diags;
 
-        return @intCast(i64, cursor.row_id);
+        return @as(i64, @intCast(cursor.row_id));
     }
 };

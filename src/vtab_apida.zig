@@ -40,7 +40,7 @@ const GeoDataJSONEntry = struct {
 
 const FetchAllGeoDataError = error{
     InvalidStatusCode,
-} || mem.Allocator.Error || fmt.ParseIntError || json.ParseError([]GeoDataJSONEntry) || curl.Error;
+} || mem.Allocator.Error || fmt.ParseIntError || json.ParseError(json.Scanner) || curl.Error;
 
 /// Fetch the Geo data. The endpoint must be either:
 /// * the general `towns_endpoint` which will return _all_ towns in France
@@ -68,15 +68,14 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
 
     //
 
-    var token_stream = json.TokenStream.init(response.body);
-    const data = try json.parse([]GeoDataJSONEntry, &token_stream, .{
-        .allocator = allocator,
+    const data = try json.parseFromSlice([]GeoDataJSONEntry, allocator, response.body, .{
         .ignore_unknown_fields = true,
     });
+    defer data.deinit();
 
-    var result = try allocator.alloc(GeoDataEntry, data.len);
-    for (result) |*entry, i| {
-        const raw_data = data[i];
+    var result = try allocator.alloc(GeoDataEntry, data.value.len);
+    for (result, 0..) |*entry, i| {
+        const raw_data = data.value[i];
 
         entry.* = .{
             .town = raw_data.nom,
@@ -157,7 +156,7 @@ pub const Table = struct {
             }
         }
 
-        builder.id.str = builder.id_str_buffer.toOwnedSlice();
+        builder.id.str = try builder.id_str_buffer.toOwnedSlice();
         builder.build();
     }
 };
@@ -300,6 +299,6 @@ pub const TableCursor = struct {
     pub fn rowId(cursor: *TableCursor, diags: *sqlite.vtab.VTabDiagnostics) RowIDError!i64 {
         _ = diags;
 
-        return @intCast(i64, cursor.pos);
+        return @as(i64, @intCast(cursor.pos));
     }
 };

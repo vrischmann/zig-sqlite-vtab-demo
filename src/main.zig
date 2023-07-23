@@ -17,7 +17,7 @@ pub const Position = struct {
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit()) {
+    defer if (gpa.deinit() == .leak) {
         std.debug.panic("leaks detected", .{});
     };
     const allocator = gpa.allocator();

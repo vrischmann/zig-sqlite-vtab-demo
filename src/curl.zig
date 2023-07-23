@@ -44,7 +44,7 @@ const TemporaryResponse = struct {
 pub const Error = error{
     CannotInitialize,
     RequestFailed,
-};
+} || mem.Allocator.Error;
 
 pub const Client = struct {
     const Self = @This();
@@ -74,9 +74,9 @@ pub const Client = struct {
         tmp.headers = std.ArrayList([]const u8).init(allocator);
 
         // Setup the URL
-        _ = c.curl_easy_setopt(self.curl, c.CURLOPT_URL, @ptrCast([*:0]const u8, url));
+        _ = c.curl_easy_setopt(self.curl, c.CURLOPT_URL, @as([*:0]const u8, @ptrCast(url)));
 
-        _ = c.curl_easy_setopt(self.curl, c.CURLOPT_USERAGENT, @ptrCast([*:0]const u8, user_agent));
+        _ = c.curl_easy_setopt(self.curl, c.CURLOPT_USERAGENT, @as([*:0]const u8, @ptrCast(user_agent)));
 
         // Setup the write and read callback
         _ = c.curl_easy_setopt(self.curl, c.CURLOPT_WRITEFUNCTION, writeCallback);
@@ -98,10 +98,10 @@ pub const Client = struct {
 
         var status: c_long = 0;
         _ = c.curl_easy_getinfo(self.curl, c.CURLINFO_RESPONSE_CODE, &status);
-        resp.status = @intCast(usize, status);
+        resp.status = @as(usize, @intCast(status));
 
-        resp.body = tmp.body.toOwnedSlice();
-        resp.headers = tmp.headers.toOwnedSlice();
+        resp.body = try tmp.body.toOwnedSlice();
+        resp.headers = try tmp.headers.toOwnedSlice();
 
         return resp;
     }
