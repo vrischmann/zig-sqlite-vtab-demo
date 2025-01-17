@@ -73,7 +73,7 @@ fn fetchAllGeoData(allocator: mem.Allocator, endpoint: [:0]const u8) FetchAllGeo
     });
     defer data.deinit();
 
-    var result = try allocator.alloc(GeoDataEntry, data.value.len);
+    const result = try allocator.alloc(GeoDataEntry, data.value.len);
     for (result, 0..) |*entry, i| {
         const raw_data = data.value[i];
 
@@ -172,7 +172,7 @@ pub const TableCursor = struct {
     pub const InitError = error{} || mem.Allocator.Error;
 
     pub fn init(gpa: mem.Allocator, parent: *Table) InitError!*TableCursor {
-        var res = try gpa.create(TableCursor);
+        const res = try gpa.create(TableCursor);
         res.* = .{
             .allocator = gpa,
             .parent = parent,
@@ -202,9 +202,9 @@ pub const TableCursor = struct {
         var postal_code: ?[]const u8 = null;
         var departement_code: ?[]const u8 = null;
 
-        var id = index.str;
+        const id = index.str;
 
-        var token_iterator = mem.tokenize(u8, id, "|");
+        var token_iterator = mem.tokenizeScalar(u8, id, '|');
         var i: usize = 0;
         while (token_iterator.next()) |token| {
             const arg = args[i];
