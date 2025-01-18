@@ -107,14 +107,14 @@ pub const Client = struct {
     }
 };
 
-fn writeCallback(data: [*]u8, _: c_int, nmemb: usize, response: *TemporaryResponse) usize {
+fn writeCallback(data: [*]u8, _: c_int, nmemb: usize, response: *TemporaryResponse) callconv(.C) usize {
     response.body.appendSlice(data[0..nmemb]) catch |err| {
         std.debug.panic("unable to write data in temporary body because of error {}", .{err});
     };
     return nmemb;
 }
 
-fn headerCallback(data: [*]u8, _: c_int, nmemb: usize, response: *TemporaryResponse) usize {
+fn headerCallback(data: [*]u8, _: c_int, nmemb: usize, response: *TemporaryResponse) callconv(.C) usize {
     response.appendHeader(data[0..nmemb]) catch |err| {
         std.debug.panic("unable to append header because of error {}", .{err});
     };

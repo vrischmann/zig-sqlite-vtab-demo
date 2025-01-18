@@ -31,6 +31,8 @@ pub const Table = struct {
         var res = try allocator.create(Table);
         errdefer res.deinit(gpa);
 
+        res.arena_state = arena.state;
+
         // Parse the arguments
         var host: []const u8 = "localhost";
         var port: c_int = 6379;
@@ -64,8 +66,6 @@ pub const Table = struct {
             \\  name TEXT
             \\)
         );
-
-        res.arena_state = arena.state;
 
         return res;
     }
@@ -111,7 +111,7 @@ pub const TableCursor = struct {
     pub const InitError = error{} || mem.Allocator.Error;
 
     pub fn init(gpa: mem.Allocator, parent: *Table) InitError!*TableCursor {
-        var res = try gpa.create(TableCursor);
+        const res = try gpa.create(TableCursor);
         res.* = .{
             .allocator = gpa,
             .parent = parent,

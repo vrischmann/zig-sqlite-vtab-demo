@@ -30,7 +30,7 @@ pub fn main() anyerror!void {
 
     var fetch_all_towns: bool = false;
 
-    var raw_args = try std.process.argsAlloc(allocator);
+    const raw_args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, raw_args);
 
     var i: usize = 0;
